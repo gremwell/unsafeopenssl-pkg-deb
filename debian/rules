@@ -1,0 +1,220 @@
+#!/usr/bin/make -f
+# Sample debian.rules file - for GNU Hello (1.3).
+# Copyright 1994,1995 by Ian Jackson.
+# I hereby give you perpetual unlimited permission to copy,
+# modify and relicense this file, provided that you do not remove
+# my name from the file itself.  (I assert my moral right of
+# paternity under the Copyright, Designs and Patents Act 1988.)
+# This file may have to be extensively modified
+#
+# Modified to be a prototype for debmake by Christoph Lameter <clameter@debian.org>
+SHELL=/bin/bash
+
+package=openssl-unsafe
+
+# For generating the manpages
+export VERSION=$(shell dpkg-parsechangelog | grep '^Version:' | sed -e 's/^.*://' -e 's/-.*//')
+
+# The binary architeture
+DEB_HOST_ARCH = $(shell dpkg-architecture -qDEB_HOST_ARCH)
+DEB_HOST_MULTIARCH=$(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+DEB_HOST_ARCH_CPU=$(shell dpkg-architecture -qDEB_HOST_ARCH_CPU)
+
+DEB_HOST_GNU_TYPE=$(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_BUILD_GNU_TYPE=$(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+ifneq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
+	export CROSS_COMPILE ?= $(DEB_HOST_GNU_TYPE)-
+endif
+
+CONFARGS  = --prefix=/usr --openssldir=/usr/lib/unsafessl --libdir=lib/$(DEB_HOST_MULTIARCH) enable-md2 enable-rfc3779 enable-ssl2 zlib enable-ssl3 enable-ssl3-method enable-weak-ssl-ciphers no-krb5
+OPT_alpha = ev4 ev5
+ARCHOPTS  = OPT_$(DEB_HOST_ARCH)
+OPTS      = $($(ARCHOPTS))
+WANTED_LIBC_VERSION = 2.3.1-10
+
+ifeq ($(DEB_HOST_ARCH_CPU), amd64)
+	CONFARGS += enable-ec_nistp_64_gcc_128
+endif
+
+MAKE_TEST = :
+ifneq (,$(findstring nocheck,$(DEB_BUILD_OPTIONS)))
+	MAKE_TEST = :
+endif
+
+build: build-arch build-indep
+build-arch: build-stamp
+build-indep: build-stamp
+build-stamp:
+	dh_testdir
+#	perl util/ssldir.pl /usr/lib/ssl
+#	chmod +x debian/libtool
+	./Configure no-shared $(CONFARGS) debian-$(DEB_HOST_ARCH)
+# rename shared libraries
+	find . -name 'Makefile' -exec sed -i -e 's/libcrypto/libunsafecrypto/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/libssl/libunsafessl/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/openssl.pc/openssl-unsafe.pc/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/LIBNAME=$$$$i/LIBNAME=unsafe$$$$i/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/-l$$$$i/-lunsafe$$$$i/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/-lcrypto/-lunsafecrypto/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/-lssl/-lunsafessl/g' {} \;
+	find . -name 'shlib_wrap.sh' -exec sed -i -e 's/libcrypto.so/libunsafecrypto.so/g' {} \;
+	find . -name 'shlib_wrap.sh' -exec sed -i -e 's/libssl.so/libunsafessl.so/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL-libcrypto/Name: OpenSSLUnsafe-libcrypto/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL-libssl/Name: OpenSSLUnsafe-libssl/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL/Name: OpenSSLUnsafe/g' {} \;
+# end renaming
+	make depend
+	make -f Makefile all
+	$(MAKE_TEST)
+	mv libunsafecrypto.a libunsafecrypto.static
+	mv libunsafessl.a libunsafessl.static
+	make -f Makefile clean
+	test -z "$(OPTS)" || for opt in $(OPTS); \
+	do \
+		set -xe; \
+		./Configure shared $(CONFARGS) debian-$(DEB_HOST_ARCH)-$$opt; \
+		find . -name 'Makefile' -exec sed -i -e 's/libcrypto/libunsafecrypto/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/libssl/libunsafessl/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/openssl.pc/openssl-unsafe.pc/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/LIBNAME=$$$$i/LIBNAME=unsafe$$$$i/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/-l$$$$i/-lunsafe$$$$i/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/-lcrypto/-lunsafecrypto/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/-lssl/-lunsafessl/g' {} \; \
+		find . -name 'shlib_wrap.sh' -exec sed -i -e 's/libcrypto.so/libunsafecrypto.so/g' {} \; \
+		find . -name 'shlib_wrap.sh' -exec sed -i -e 's/libssl.so/libunsafessl.so/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL-libcrypto/Name: OpenSSLUnsafe-libcrypto/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL-libssl/Name: OpenSSLUnsafe-libssl/g' {} \; \
+		find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL/Name: OpenSSLUnsafe/g' {} \; \
+		make -f Makefile all; \
+		$(MAKE_TEST); \
+		mkdir -p $$opt; \
+		mv libunsafecrypto.so* libunsafessl.so* $$opt/; \
+		make -f Makefile clean; \
+	done
+	./Configure shared $(CONFARGS) debian-$(DEB_HOST_ARCH)
+# rename more...
+	find . -name 'Makefile' -exec sed -i -e 's/libcrypto/libunsafecrypto/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/libssl/libunsafessl/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/openssl.pc/openssl-unsafe.pc/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/LIBNAME=$$$$i/LIBNAME=unsafe$$$$i/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/-l$$$$i/-lunsafe$$$$i/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/-lcrypto/-lunsafecrypto/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/-lssl/-lunsafessl/g' {} \;
+	find . -name 'shlib_wrap.sh' -exec sed -i -e 's/libcrypto.so/libunsafecrypto.so/g' {} \;
+	find . -name 'shlib_wrap.sh' -exec sed -i -e 's/libssl.so/libunsafessl.so/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL-libcrypto/Name: OpenSSLUnsafe-libcrypto/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL-libssl/Name: OpenSSLUnsafe-libssl/g' {} \;
+	find . -name 'Makefile' -exec sed -i -e 's/Name: OpenSSL/Name: OpenSSLUnsafe/g' {} \;
+# end renaming
+	#make -f Makefile depend
+	ln -sf apps/openssl.pod crypto/crypto.pod ssl/ssl.pod doc/
+#	make -f Makefile linux-shared
+	make -f Makefile all
+	$(MAKE_TEST)
+#	strip apps/openssl
+#	make -f Makefile clean
+#	./Configure --prefix=/usr --openssldir=/usr/lib/ssl no-idea no-mdc2 no-rc5 debian-$(DEB_HOST_ARCH)
+#	make -f Makefile all
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	-rm -f build-stamp
+	-./Configure $(CONFARGS) debian-$(DEB_HOST_ARCH)
+	[ ! -f Makefile ] || make -f Makefile  clean clean-shared
+	#-make -f Makefile  dclean
+#	perl util/ssldir.pl /usr/local/ssl
+	-rm -f test/.rnd test/testkey.pem test/testreq.pem test/certCA.srl
+	-rm -f util/mk1mf.bak Makefile.bak `find . -name Makefile.save` 
+	-rm -f crypto/pem/ctx_size
+	-rm -f `find . -name "*~"`
+	-rm -f `find . -name "*.orig" -o -name "*.rej"`
+	-rm -f certs/*.0 certs/*.1
+#	-rm -rf debian/tmp debian/files* core `find debian/* -type d`
+	-rm -rf core $(OPTS)
+	-rm doc/*.pod
+	-rm -f libunsafecrypto.* libunsafessl.*
+	-cd test && rm -f .rnd tmp.bntest tmp.bctest *.o *.obj lib tags core .pure .nfs* *.old *.bak fluff bntest ectest  ecdsatest ecdhtest ideatest md2test  md4test md5test hmactest rc2test rc4test rc5test destest shatest sha1test sha256t sha512t mdc2test rmdtest randtest dhtest enginetest bftest casttest ssltest exptest dsatest rsa_test evp_test *.ss *.srl log dummytest newkey.pem igetest
+	-rm Makefile apps/CA.pl tools/c_rehash crypto/opensslconf.h crypto/x86_64cpuid.S
+	rm -f test/asn1test test/wp_test test/srptest test/jpaketest
+	rm -f certs/demo/*.0
+	rm -rf crypto/aes/aes-armv4.S crypto/bn/armv4-gf2m.S crypto/modes/ghash-armv4.S crypto/sha/*.S
+	find . -type l -exec rm '{}' \;
+	dh_clean
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean
+	dh_installdirs
+	make -f Makefile install INSTALL_PREFIX=`pwd`/debian/tmp MANDIR=/usr/share/man
+# rename include directory
+	mv debian/tmp/usr/include/openssl{,-unsafe}
+# fix include paths in the renamed include directory
+	find debian/tmp/usr/include/openssl-unsafe -name '*.h' -exec sed -i -e 's/<openssl\//<openssl-unsafe\//g' {} \;
+# we do not need these binaries
+	rm -f debian/tmp/usr/bin/c_rehash
+
+
+binary-indep:	build install
+	dh_testdir
+	dh_testroot
+	dh_installdirs -i
+	dh_installdocs -i
+	dh_movefiles -i
+	dh_installchangelogs -i CHANGES
+	dh_compress -i
+	dh_fixperms -i
+	dh_gencontrol -i
+	dh_installdeb -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+binary-arch:	build install
+	dh_testdir
+	dh_testroot
+	dh_installdirs -a
+	# pic static libraries, nobody should need them
+#	mv debian/tmp/usr/lib/libcrypto.a debian/tmp/usr/lib/libcrypto_pic.a
+#	mv debian/tmp/usr/lib/libssl.a debian/tmp/usr/lib/libssl_pic.a
+	cp -pf libunsafecrypto.static debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/libunsafecrypto.a
+	cp -pf libunsafessl.static debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/libunsafessl.a
+	mkdir -p debian/tmp/etc/unsafessl
+	mv debian/tmp/usr/lib/unsafessl/{certs,openssl.cnf,private} debian/tmp/etc/unsafessl/
+	ln -s /etc/unsafessl/{certs,openssl.cnf,private} debian/tmp/usr/lib/unsafessl/
+	cp -auv lib*.so* debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/
+	for opt in $(OPTS); do set -xe; mkdir -p debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/$$opt; cp -auv $$opt/lib*.so* debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/$$opt/; done
+	mkdir -p debian/tmp/usr/include/$(DEB_HOST_MULTIARCH)/openssl-unsafe
+	mv debian/tmp/usr/include/openssl-unsafe/opensslconf.h debian/tmp/usr/include/$(DEB_HOST_MULTIARCH)/openssl-unsafe/
+	install debian/copyright debian/libunsafessl1.0.2/usr/share/doc/libunsafessl1.0.2/
+	install debian/changelog debian/libunsafessl1.0.2/usr/share/doc/libunsafessl1.0.2/changelog.Debian
+	install debian/copyright debian/libunsafessl-dev/usr/share/doc/libunsafessl-dev/
+	install debian/changelog debian/libunsafessl-dev/usr/share/doc/libunsafessl-dev/changelog.Debian
+
+	dh_installdocs -a CHANGES.SSLeay README NEWS debian/README.optimization
+	dh_installexamples -a
+	dh_installchangelogs -a CHANGES
+	dh_installman -popenssl-unsafe
+	dh_installdebconf -a
+	dh_movefiles -a
+	dh_compress -a
+	chmod 700 debian/openssl-unsafe/etc/unsafessl/private
+	dh_fixperms -a -X etc/unsafessl/private
+	dh_strip -plibunsafessl1.0.2 --dbg-package=libunsafessl1.0.2-dbg
+	dh_strip -a -Nlibunsafessl1.0.2
+	dh_perl -a -d
+#	dpkg-gensymbols -Pdebian/libunsafessl1.0.2/ -plibunsafessl1.0.2 -c4
+	dh_makeshlibs -a -V "libunsafessl1.0.2" -Xengines
+	dh_shlibdeps -a -L libunsafessl1.0.2 -l debian/libunsafessl1.0.2/usr/lib/$(DEB_HOST_MULTIARCH)
+	dh_gencontrol -a
+	dh_installdeb -a
+	dh_md5sums -a
+	dh_builddeb -a
+	echo -en "\a"
+
+# Below here is fairly generic really
+
+binary:		binary-indep binary-arch
+
+.PHONY: binary binary-arch binary-indep clean install

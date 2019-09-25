@@ -1,0 +1,6 @@
+usr/bin
+usr/lib/unsafessl/misc
+usr/lib/unsafessl/certs
+usr/lib/unsafessl/openssl.cnf
+usr/lib/unsafessl/private
+etc/unsafessl

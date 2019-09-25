@@ -1,0 +1,6 @@
+usr/lib/*/libunsafessl.so
+usr/lib/*/libunsafecrypto.so
+usr/lib/*/libunsafessl.a
+usr/lib/*/libunsafecrypto.a
+usr/lib/*/pkgconfig
+usr/include
