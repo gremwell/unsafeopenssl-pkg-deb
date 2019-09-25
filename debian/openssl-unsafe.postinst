@@ -1,0 +1,9 @@
+#!/bin/sh -e
+
+if [ ! -e /usr/lib/unsafessl ]
+then
+  echo Linking /usr/lib/unsafessl to /etc/unsafessl
+  ln -sf /etc/unsafessl /usr/lib/unsafessl
+fi
+
+#DEBHELPER#
