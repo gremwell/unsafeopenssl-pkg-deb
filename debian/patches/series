@@ -1,0 +1,14 @@
+debian-targets.patch
+engines-path.patch
+no-rpath.patch
+no-symbolic.patch
+pic.patch
+valgrind.patch
+shared-lib-ext.patch
+version-script.patch
+c_rehash-compat.patch
+disable_freelist.patch
+soname.patch
+disable_sslv3_test.patch
+libdoc-manpgs-pod-spell.patch
+openssl-unsafe-rename.patch

@@ -1,0 +1,5 @@
+openssl-unsafe (1.0.2i-1kali1) kali; urgency=low
+
+  * initial build
+
+ -- Pavel Nakonechnyi <pavel@gremwell.com>  Wed, 25 Sep 2019 12:00:00 +0100
