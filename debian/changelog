@@ -1,3 +1,9 @@
+openssl-unsafe (1.0.2u-1ubuntu1ppa1~ubuntu19.10) eoan; urgency=low
+
+  * v1.0.2u
+
+ -- Pavel Nakonechnyi <pavel@gremwell.com>  Mon, 24 Feb 2020 12:00:00 +0100
+
 openssl-unsafe (1.0.2i-1ubuntu1ppa1~ubuntu19.10) eoan; urgency=low
 
   * initial build
