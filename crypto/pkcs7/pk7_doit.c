@@ -191,7 +191,8 @@ static int pkcs7_encode_rinfo(PKCS7_RECIP_INFO *ri,
 }
 
 static int pkcs7_decrypt_rinfo(unsigned char **pek, int *peklen,
-                               PKCS7_RECIP_INFO *ri, EVP_PKEY *pkey)
+                               PKCS7_RECIP_INFO *ri, EVP_PKEY *pkey,
+                               size_t fixlen)
 {
     EVP_PKEY_CTX *pctx = NULL;
     unsigned char *ek = NULL;
@@ -224,7 +225,9 @@ static int pkcs7_decrypt_rinfo(unsigned char **pek, int *peklen,
     }
 
     if (EVP_PKEY_decrypt(pctx, ek, &eklen,
-                         ri->enc_key->data, ri->enc_key->length) <= 0) {
+                         ri->enc_key->data, ri->enc_key->length) <= 0
+            || eklen == 0
+            || (fixlen != 0 && eklen != fixlen)) {
         ret = 0;
         PKCS7err(PKCS7_F_PKCS7_DECRYPT_RINFO, ERR_R_EVP_LIB);
         goto err;
@@ -375,16 +378,18 @@ BIO *PKCS7_dataInit(PKCS7 *p7, BIO *bio)
     }
 
     if (bio == NULL) {
-        if (PKCS7_is_detached(p7))
+        if (PKCS7_is_detached(p7)) {
             bio = BIO_new(BIO_s_null());
-        else if (os && os->length > 0)
+        } else if (os && os->length > 0) {
             bio = BIO_new_mem_buf(os->data, os->length);
-        if (bio == NULL) {
+        } else {
             bio = BIO_new(BIO_s_mem());
             if (bio == NULL)
                 goto err;
             BIO_set_mem_eof_return(bio, 0);
         }
+        if (bio == NULL)
+            goto err;
     }
     if (out)
         BIO_push(out, bio);
@@ -569,13 +574,14 @@ BIO *PKCS7_dataDecode(PKCS7 *p7, EVP_PKEY *pkey, BIO *in_bio, X509 *pcert)
             for (i = 0; i < sk_PKCS7_RECIP_INFO_num(rsk); i++) {
                 ri = sk_PKCS7_RECIP_INFO_value(rsk, i);
 
-                if (pkcs7_decrypt_rinfo(&ek, &eklen, ri, pkey) < 0)
+                if (pkcs7_decrypt_rinfo(&ek, &eklen, ri, pkey,
+                        EVP_CIPHER_key_length(evp_cipher)) < 0)
                     goto err;
                 ERR_clear_error();
             }
         } else {
             /* Only exit on fatal errors, not decrypt failure */
-            if (pkcs7_decrypt_rinfo(&ek, &eklen, ri, pkey) < 0)
+            if (pkcs7_decrypt_rinfo(&ek, &eklen, ri, pkey, 0) < 0)
                 goto err;
             ERR_clear_error();
         }
