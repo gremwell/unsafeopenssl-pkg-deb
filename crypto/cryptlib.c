@@ -1,6 +1,6 @@
 /* crypto/cryptlib.c */
 /* ====================================================================
- * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1998-2019 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -469,11 +469,18 @@ void CRYPTO_THREADID_set_pointer(CRYPTO_THREADID *id, void *ptr)
     }
 }
 
+#ifdef OPENSSL_FIPS
+extern int FIPS_crypto_threadid_set_callback(void (*func) (CRYPTO_THREADID *));
+#endif
+
 int CRYPTO_THREADID_set_callback(void (*func) (CRYPTO_THREADID *))
 {
     if (threadid_callback)
         return 0;
     threadid_callback = func;
+#ifdef OPENSSL_FIPS
+    FIPS_crypto_threadid_set_callback(func);
+#endif
     return 1;
 }
 
@@ -737,6 +744,11 @@ int OPENSSL_NONPIC_relocated = 0;
 #if !defined(OPENSSL_CPUID_SETUP) && !defined(OPENSSL_CPUID_OBJ)
 void OPENSSL_cpuid_setup(void)
 {
+}
+
+unsigned long OPENSSL_rdtsc(void)
+{
+    return 0;
 }
 #endif
 
