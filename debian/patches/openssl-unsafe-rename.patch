@@ -12,7 +12,7 @@
 --- openssl/Makefile
 +++ openssl/Makefile
 @@ -181,7 +181,7 @@ SHARED_LIBS_LINK_EXTS=
- SHARED_LDFLAGS=
+ SHARED_LDFLAGS=-m64
  
  GENERAL=        Makefile
 -BASENAME=       openssl
